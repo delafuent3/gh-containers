@@ -1,0 +1,167 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: create IAM roles for ECS usage upfront
+Parameters:
+  Environment:
+    Type: String
+    Default: 'ecs'
+
+  Owner:
+    Type: String
+    Default: 'delafuent3'
+
+Resources:
+  # ---------------------------------------------------------------------------------------------- Role - EC2 ----------
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Owner}-${Environment}-ec2-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-ec2-role'
+
+  # ----------------------------------------------------------------------------------------- Role - ECS Role ----------
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Owner}-${Environment}-ecs-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-ec2-role'
+
+#      Policies:
+#      - PolicyName: ecs-service
+#        PolicyDocument:
+#          Statement:
+#          - Effect: Allow
+#            Action:
+#              # Rules which allow ECS to attach network interfaces to instances
+#              # on your behalf in order for awsvpc networking mode to work right
+#              - 'ec2:AttachNetworkInterface'
+#              - 'ec2:CreateNetworkInterface'
+#              - 'ec2:CreateNetworkInterfacePermission'
+#              - 'ec2:DeleteNetworkInterface'
+#              - 'ec2:DeleteNetworkInterfacePermission'
+#              - 'ec2:Describe*'
+#              - 'ec2:DetachNetworkInterface'
+#
+#              # Rules which allow ECS to update load balancers on your behalf
+#              # with the information sabout how to send traffic to your containers
+#              - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+#              - 'elasticloadbalancing:DeregisterTargets'
+#              - 'elasticloadbalancing:Describe*'
+#              - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+#              - 'elasticloadbalancing:RegisterTargets'
+#            Resource: '*'
+
+
+# -------------------------------------------------------------------------------------- Role - Autoscaling ----------
+  AutoscalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Owner}-${Environment}-autoscaling-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [application-autoscaling.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-autoscaling-role'
+
+#      Policies:
+#      - PolicyName: service-autoscaling
+#        PolicyDocument:
+#          Statement:
+#          - Effect: Allow
+#            Action:
+#              - 'application-autoscaling:*'
+#              - 'cloudwatch:DescribeAlarms'
+#              - 'cloudwatch:PutMetricAlarm'
+#              - 'ecs:DescribeServices'
+#              - 'ecs:UpdateService'
+#            Resource: '*'
+#
+#
+#
+
+  # ------------------------------------------------------------------------------- Role - ECS Task Execution ----------
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Owner}-${Environment}-ecs-task-execution-role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs-tasks.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-ecs-task-execution-role'
+
+#      Policies:
+#        - PolicyName: AmazonECSTaskExecutionRolePolicy
+#          PolicyDocument:
+#            Statement:
+#            - Effect: Allow
+#              Action:
+#                # Allow the ECS Tasks to download images from ECR
+#                - 'ecr:GetAuthorizationToken'
+#                - 'ecr:BatchCheckLayerAvailability'
+#                - 'ecr:GetDownloadUrlForLayer'
+#                - 'ecr:BatchGetImage'
+#                # Allow the ECS tasks to upload logs to CloudWatch
+#                - 'logs:CreateLogStream'
+#                - 'logs:PutLogEvents'
+#              Resource: '*'
+
+Outputs:
+  EC2Role:
+    Description: The ARN of the EC2 role
+    Value: !GetAtt 'EC2Role.Arn'
+    Export:
+      Name: !Sub '${Owner}-${Environment}-ec2-role'
+  ECSRole:
+    Description: The ARN of the ECS role
+    Value: !GetAtt 'ECSRole.Arn'
+    Export:
+      Name: !Sub '${Owner}-${Environment}-ecs-role'
+
+  AutoscalingRole:
+    Description: The ARN of the role used for autoscaling
+    Value: !GetAtt 'AutoscalingRole.Arn'
+    Export:
+      Name: !Sub '${Owner}-${Environment}-autoscaling-role'
+
+  ECSTaskExecutionRole:
+    Description: The ARN of the ECS Task Execution role
+    Value: !GetAtt 'ECSTaskExecutionRole.Arn'
+    Export:
+      Name: !Sub '${Owner}-${Environment}-ecs-task-execution-role'

@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+
+  SubnetCount:
+    Type: Number
+    Default: 4
+
+  Environment:
+    Type: String
+    Default: 'ecs'
+
+  Owner:
+    Type: String
+    Default: 'delafuent3'
+
+Resources:
+  myvpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-vpc'
+        - Key: Environment
+          Value: !Ref Environment
+
+  internetgateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-internetgateway'
+        - Key: Environment
+          Value: !Ref Environment
+
+  attachgateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref myvpc
+      InternetGatewayId: !Ref internetgateway
+
+  publicsubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, !Ref SubnetCount, 8]]
+      VpcId: !Ref myvpc
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-publicsubnet1'
+        - Key: Environment
+          Value: !Ref Environment
+
+  publicsubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, !Ref SubnetCount, 8]]
+      VpcId: !Ref myvpc
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-publicsubnet2'
+        - Key: Environment
+          Value: !Ref Environment
+
+  privatesubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, !Ref SubnetCount, 8]]
+      VpcId: !Ref myvpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-privatesubnet1'
+        - Key: Environment
+          Value: !Ref Environment
+
+  privatesubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, !Ref SubnetCount, 8]]
+      VpcId: !Ref myvpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-privatesubnet2'
+        - Key: Environment
+          Value: !Ref Environment
+
+  publicroutetable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myvpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-publicroutetable'
+        - Key: Environment
+          Value: !Ref Environment
+
+  publicroute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref publicroutetable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref internetgateway
+
+  privateroutetable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myvpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-privateroutetable'
+        - Key: Environment
+          Value: !Ref Environment
+
+  privateroute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref natgateway
+
+  natgatewayeip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-elasticip'
+        - Key: Environment
+          Value: !Ref Environment
+
+  natgateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt natgatewayeip.AllocationId
+      SubnetId: !Ref publicsubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub '${Owner}-${Environment}-natgateway'
+        - Key: Environment
+          Value: !Ref Environment
+
+  publicsubnetroutetableassociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref publicsubnet1
+      RouteTableId: !Ref publicroutetable
+
+  publicsubnetroutetableassociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref publicsubnet2
+      RouteTableId: !Ref publicroutetable
+
+  privatesubnetroutetableassociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref privatesubnet1
+      RouteTableId: !Ref privateroutetable
+
+  privatesubnetroutetableassociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref privatesubnet2
+      RouteTableId: !Ref privateroutetable
+
+Outputs:
+  vpcid:
+    Description: VPC ID
+    Value: !Ref myvpc
+    Export:
+      Name: !Sub '${Owner}-${Environment}-vpcid'
+
+  publicsubnet1id:
+    Description: Public Subnet 1 ID
+    Value: !Ref publicsubnet1
+    Export:
+      Name: !Sub '${Owner}-${Environment}-publicsubnet1id'
+
+  publicsubnet2id:
+    Description: Public Subnet 2 ID
+    Value: !Ref publicsubnet2
+    Export:
+      Name: !Sub '${Owner}-${Environment}-publicsubnet2id'
+
+  privatesubnet1id:
+    Description: Private Subnet 1 ID
+    Value: !Ref privatesubnet1
+    Export:
+      Name: !Sub '${Owner}-${Environment}-privatesubnet1id'
+
+  privatesubnet2id:
+    Description: Private Subnet 2 ID
+    Value: !Ref privatesubnet2
+    Export:
+      Name: !Sub '${Owner}-${Environment}-privatesubnet2id'
